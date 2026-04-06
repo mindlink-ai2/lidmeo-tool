@@ -106,6 +106,7 @@ function App() {
   const [usageCount, setUsageCount] = useState(0);
   const [copied, setCopied] = useState(null);
   const [expandedMsg, setExpandedMsg] = useState(null);
+  const [apiError, setApiError] = useState(null);
   const maxFree = 10;
   const topRef = useRef(null);
 
@@ -119,12 +120,37 @@ function App() {
     );
   };
 
-  const generateMessages = async () => {
+  const DEMO_FALLBACK = (selectedToneDetails, name) => selectedToneDetails.map(t => ({
+    tone_id: t.id,
+    tone_name: t.name,
+    messages: [
+      { text: `Bonjour Thomas,\n\nVotre post sur l'acquisition en agence dev a touché juste. Belle réflexion.\n\n${name || "Chez nous"}, on accompagne des agences de votre profil pour structurer leur acquisition LinkedIn. Les résultats sont encourageants.\n\nVous avez 15 min pour qu'on en parle ?`, hook: "Rebond sur un post récent", signal: "Post LinkedIn" },
+      { text: `Bonjour Émilie,\n\nContentLab se positionne sur le content marketing SaaS. Solide positionnement.\n\nOn travaille avec des agences de votre profil pour ajouter LinkedIn comme canal d'acquisition. En moyenne : 4 RDV qualifiés par semaine.\n\nÇa vous intéresse ?`, hook: "Valorisation positionnement + résultat", signal: "Positionnement niche" },
+      { text: `Bonjour Marc,\n\nLe travail de WebFactory en SEO technique est impressionnant. J'ai regardé votre portfolio.\n\nOn aide des agences SEO à développer leur acquisition via LinkedIn. Les retours sont très positifs.\n\n15 min pour en parler ?`, hook: "Compliment portfolio + proposition", signal: "Expertise technique visible" }
+    ]
+  }));
+
+  const generateMessages = async (demoMode = false) => {
     if (usageCount >= maxFree) return;
     setLoading(true);
+    setApiError(null);
     setStep(3);
 
     const selectedToneDetails = TONES.filter(t => selectedTones.includes(t.id));
+
+    if (demoMode) {
+      await new Promise(r => setTimeout(r, 1200));
+      setRecommendation({
+        tone_id: selectedToneDetails[0]?.id || "direct",
+        tone_name: selectedToneDetails[0]?.name || "Direct",
+        message_index: 0,
+        reason: "Ce message combine une valorisation sincère du travail du prospect avec une proposition d'échange d'égal à égal. Le ton est respectueux et le CTA est naturel."
+      });
+      setMessages(DEMO_FALLBACK(selectedToneDetails, userInfo.name));
+      setUsageCount(prev => prev + 1);
+      setLoading(false);
+      return;
+    }
 
     try {
       // Step 1: Fetch profile via Unipile
@@ -135,7 +161,10 @@ function App() {
         body: JSON.stringify({ profileUrl }),
       });
 
-      if (!profileRes.ok) throw new Error("Erreur profil");
+      if (!profileRes.ok) {
+        const errData = await profileRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Impossible d'analyser ce profil LinkedIn.");
+      }
       const profile = await profileRes.json();
 
       setLoadingStep("Analyse du profil, des posts et commentaires...");
@@ -157,7 +186,10 @@ function App() {
         }),
       });
 
-      if (!genRes.ok) throw new Error("Erreur génération");
+      if (!genRes.ok) {
+        const errData = await genRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Erreur lors de la génération des messages.");
+      }
       const data = await genRes.json();
 
       setRecommendation(data.recommended || null);
@@ -165,24 +197,9 @@ function App() {
       setUsageCount(prev => prev + 1);
     } catch (err) {
       console.error(err);
-      // Fallback
-      const fallback = selectedToneDetails.map(t => ({
-        tone_id: t.id,
-        tone_name: t.name,
-        messages: [
-          { text: `Bonjour Thomas,\n\nVotre post sur l'acquisition en agence dev a touché juste. Belle réflexion.\n\n${userInfo.name || "Chez nous"}, on accompagne des agences de votre profil pour structurer leur acquisition LinkedIn. Les résultats sont encourageants.\n\nVous avez 15 min pour qu'on en parle ?`, hook: "Rebond sur un post récent", signal: "Post LinkedIn" },
-          { text: `Bonjour Émilie,\n\nContentLab se positionne sur le content marketing SaaS. Solide positionnement.\n\nOn travaille avec des agences de votre profil pour ajouter LinkedIn comme canal d'acquisition. En moyenne : 4 RDV qualifiés par semaine.\n\nÇa vous intéresse ?`, hook: "Valorisation positionnement + résultat", signal: "Positionnement niche" },
-          { text: `Bonjour Marc,\n\nLe travail de WebFactory en SEO technique est impressionnant. J'ai regardé votre portfolio.\n\nOn aide des agences SEO à développer leur acquisition via LinkedIn. Les retours sont très positifs.\n\n15 min pour en parler ?`, hook: "Compliment portfolio + proposition", signal: "Expertise technique visible" }
-        ]
-      }));
-      setRecommendation({
-        tone_id: selectedToneDetails[0]?.id || "direct",
-        tone_name: selectedToneDetails[0]?.name || "Direct",
-        message_index: 0,
-        reason: "Ce message combine une valorisation sincère du travail du prospect avec une proposition d'échange d'égal à égal. Le ton est respectueux et le CTA est naturel."
-      });
-      setMessages(fallback);
-      setUsageCount(prev => prev + 1);
+      setApiError(err.message || "Une erreur inattendue s'est produite.");
+      setMessages([]);
+      setRecommendation(null);
     }
 
     setLoading(false);
@@ -583,9 +600,15 @@ function App() {
         <button
           style={S.btnPrimary(!profileUrl.includes("linkedin.com") || usageCount >= maxFree)}
           disabled={!profileUrl.includes("linkedin.com") || usageCount >= maxFree}
-          onClick={generateMessages}
+          onClick={() => generateMessages(false)}
         >
           Analyser & générer les messages
+        </button>
+        <button
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: C.textLight, marginTop: 12, fontFamily: "inherit", textDecoration: "underline" }}
+          onClick={() => generateMessages(true)}
+        >
+          Tester avec un profil démo
         </button>
       </div>
 
@@ -611,6 +634,33 @@ function App() {
           return m ? { ...m, tone_name: recommendation.tone_name, tone_id: recommendation.tone_id } : null;
         })()
       : null;
+
+    if (apiError) {
+      return (
+        <div>
+          <div style={{ background: "#FEF2F2", border: "1.5px solid #FECACA", borderRadius: 14, padding: "24px 20px", textAlign: "center", marginBottom: 24 }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+            <p style={{ fontSize: 15, fontWeight: 700, color: "#991B1B", margin: "0 0 6px" }}>
+              Impossible d'analyser ce profil
+            </p>
+            <p style={{ fontSize: 13, color: "#B91C1C", margin: "0 0 16px", lineHeight: 1.5 }}>
+              {apiError}
+            </p>
+            <p style={{ fontSize: 12, color: "#DC2626", margin: 0 }}>
+              Vérifiez l'URL et réessayez, ou testez avec un profil démo.
+            </p>
+          </div>
+          <div style={S.btnRow}>
+            <button style={S.btnSecondary} onClick={() => { setApiError(null); setStep(2); }}>
+              ← Réessayer
+            </button>
+            <button style={{ ...S.btnPrimary(false), flex: 1 }} onClick={() => { setApiError(null); generateMessages(true); }}>
+              Tester avec un profil démo
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div>

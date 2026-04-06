@@ -96,12 +96,23 @@ Pour chaque ton, génère 3 messages avec des approches différentes (rebond sur
     });
 
     const raw = completion.choices[0]?.message?.content || "";
-    const clean = raw.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(clean);
+    console.log("[generate] Raw OpenAI response:", raw);
+    const clean = raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+
+    let parsed;
+    try {
+      parsed = JSON.parse(clean);
+    } catch (parseErr) {
+      console.error("[generate] JSON parse failed. Raw content:", raw);
+      return NextResponse.json(
+        { error: "La réponse de l'IA n'est pas un JSON valide" },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json(parsed);
   } catch (err) {
-    console.error("Generate API error:", err);
+    console.error("[generate] API error:", err);
     return NextResponse.json(
       { error: "Erreur lors de la génération des messages" },
       { status: 500 }
