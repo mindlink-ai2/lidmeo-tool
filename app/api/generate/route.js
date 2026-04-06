@@ -96,6 +96,7 @@ Pour chaque ton, génère 3 messages avec des approches différentes (rebond sur
     });
 
     const raw = completion.choices[0]?.message?.content || "";
+    console.log("[generate] Model used:", completion.model);
     console.log("[generate] Raw OpenAI response:", raw);
     const clean = raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
 

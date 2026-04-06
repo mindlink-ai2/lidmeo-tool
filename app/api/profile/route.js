@@ -81,13 +81,14 @@ export async function POST(req) {
     }
 
     // 3. Build clean profile object
+    // Note: Unipile confirmed fields — no "company" at root, use work_experience[0]
     const cleanProfile = {
-      firstName: profile.first_name || profile.firstName || "",
-      lastName: profile.last_name || profile.lastName || "",
+      firstName: profile.first_name || "",
+      lastName: profile.last_name || "",
       headline: profile.headline || "",
-      company: profile.current_company?.name || profile.company || "",
-      location: profile.location || profile.region || "",
-      about: profile.summary || profile.about || profile.description || "",
+      company: profile.work_experience?.[0]?.company || "",
+      location: profile.location || "",
+      about: profile.summary || "",
       recentPosts,
       recentComments: [],
     };
