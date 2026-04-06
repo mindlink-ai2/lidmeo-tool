@@ -33,8 +33,8 @@ export async function GET() {
     const completion = await openai.chat.completions.create({
       model: "gpt-5.4-mini",
       messages: [
-        { role: "system", content: "Retourne UNIQUEMENT ce JSON valide sans markdown : {\"recommended\":{\"tone_id\":\"direct\",\"tone_name\":\"Direct\",\"message_index\":0,\"reason\":\"test\"},\"tones\":[{\"tone_id\":\"direct\",\"tone_name\":\"Direct\",\"messages\":[{\"text\":\"Message test pour Bill Gates.\",\"hook\":\"Test hook\",\"signal\":\"Test signal\"}]}]}" },
-        { role: "user", content: `Profil: ${testProfile.firstName} ${testProfile.lastName}, ${testProfile.headline}. Offre: ${testUserInfo.offer}. Génère 1 message direct.` },
+        { role: "system", content: "Retourne UNIQUEMENT ce JSON valide sans markdown : {\"recommended\":{\"tone_id\":\"direct\",\"tone_name\":\"Direct\",\"reason\":\"test\"},\"tones\":[{\"tone_id\":\"direct\",\"tone_name\":\"Direct\",\"internal_message\":\"Message LinkedIn test.\",\"relance_linkedin\":\"Relance test.\",\"message_mail\":\"Objet : test\\n\\nBonjour Bill,\\n\\nEmail test.\\n\\nLilian\",\"resume_profil\":\"Résumé test.\",\"linkedinHeadline\":\"Co-chair, Bill & Melinda Gates Foundation\",\"linkedinJobTitle\":\"Co-chair\",\"companyIndustry\":\"Foundation\",\"linkedinDescription\":\"Co-chair of the Bill & Melinda Gates Foundation.\",\"linkedinSkillsLabel\":\"philanthropy\"}]}" },
+        { role: "user", content: `Profil: ${testProfile.firstName} ${testProfile.lastName}, ${testProfile.headline}. Offre: ${testUserInfo.offer}. Génère un pack complet pour 1 ton direct.` },
       ],
       max_completion_tokens: 500,
       temperature: 0.5,
