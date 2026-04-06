@@ -25,6 +25,14 @@ export async function POST(req) {
     }
 
     console.log("[profile] Fetching profile for username:", username);
+    console.log("[profile] Env check — DSN:", UNIPILE_DSN, "| ACCOUNT_ID:", UNIPILE_ACCOUNT_ID, "| API_KEY set:", !!UNIPILE_API_KEY);
+
+    if (!UNIPILE_DSN || !UNIPILE_API_KEY || !UNIPILE_ACCOUNT_ID) {
+      return NextResponse.json(
+        { error: `Variables d'environnement manquantes : ${!UNIPILE_DSN ? "UNIPILE_DSN " : ""}${!UNIPILE_API_KEY ? "UNIPILE_API_KEY " : ""}${!UNIPILE_ACCOUNT_ID ? "UNIPILE_ACCOUNT_ID" : ""}`.trim() },
+        { status: 500 }
+      );
+    }
 
     const headers = {
       "X-API-KEY": UNIPILE_API_KEY,
@@ -87,6 +95,6 @@ export async function POST(req) {
     return NextResponse.json(cleanProfile);
   } catch (err) {
     console.error("[profile] API error:", err);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json({ error: err.message || "Erreur serveur" }, { status: 500 });
   }
 }
