@@ -91,7 +91,7 @@ Pour chaque ton, génère 3 messages avec des approches différentes (rebond sur
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 4000,
+      max_completion_tokens: 4000,
       temperature: 0.8,
     });
 

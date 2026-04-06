@@ -36,7 +36,7 @@ export async function GET() {
         { role: "system", content: "Retourne UNIQUEMENT ce JSON valide sans markdown : {\"recommended\":{\"tone_id\":\"direct\",\"tone_name\":\"Direct\",\"message_index\":0,\"reason\":\"test\"},\"tones\":[{\"tone_id\":\"direct\",\"tone_name\":\"Direct\",\"messages\":[{\"text\":\"Message test pour Bill Gates.\",\"hook\":\"Test hook\",\"signal\":\"Test signal\"}]}]}" },
         { role: "user", content: `Profil: ${testProfile.firstName} ${testProfile.lastName}, ${testProfile.headline}. Offre: ${testUserInfo.offer}. Génère 1 message direct.` },
       ],
-      max_tokens: 500,
+      max_completion_tokens: 500,
       temperature: 0.5,
     });
     modelUsed = completion.model;
