@@ -2,7 +2,8 @@
 import { NextResponse } from "next/server";
 
 const UNIPILE_API_KEY = process.env.UNIPILE_API_KEY;
-const UNIPILE_DSN = process.env.UNIPILE_DSN;
+const UNIPILE_DSN_RAW = process.env.UNIPILE_DSN || "";
+const UNIPILE_DSN = UNIPILE_DSN_RAW.startsWith("http") ? UNIPILE_DSN_RAW : `https://${UNIPILE_DSN_RAW}`;
 const UNIPILE_ACCOUNT_ID = process.env.UNIPILE_ACCOUNT_ID;
 
 // Extract LinkedIn username from URL
