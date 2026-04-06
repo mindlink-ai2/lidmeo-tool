@@ -93,36 +93,15 @@ const TONES = [
   }
 ];
 
-const RESULT_FIELDS = [
-  {
-    key: "internal_message",
-    label: "Message d'ouverture LinkedIn",
-    copyLabel: "Copier le message"
-  },
-  {
-    key: "relance_linkedin",
-    label: "Relance LinkedIn",
-    copyLabel: "Copier la relance"
-  },
-  {
-    key: "message_mail",
-    label: "Email",
-    copyLabel: "Copier l'email"
-  },
-  {
-    key: "resume_profil",
-    label: "Résumé commercial",
-    copyLabel: "Copier le résumé"
-  }
-];
-
-const PROFILE_FIELDS = [
-  { key: "linkedinHeadline", label: "Headline" },
-  { key: "linkedinJobTitle", label: "Poste" },
-  { key: "companyIndustry", label: "Secteur" },
-  { key: "linkedinDescription", label: "Description" },
-  { key: "linkedinSkillsLabel", label: "Compétences" }
-];
+function getInitials(profile) {
+  const base = profile?.fullName || [profile?.firstName, profile?.lastName].filter(Boolean).join(" ");
+  return base
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase() || "")
+    .join("") || "LI";
+}
 
 function App() {
   const [step, setStep] = useState(0);
@@ -130,13 +109,13 @@ function App() {
   const [previewTone, setPreviewTone] = useState(null);
   const [userInfo, setUserInfo] = useState({ name: "", offer: "", target: "", valueProposition: "" });
   const [profileUrl, setProfileUrl] = useState("");
+  const [prospectProfile, setProspectProfile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
   const [messages, setMessages] = useState([]);
   const [recommendation, setRecommendation] = useState(null);
   const [usageCount, setUsageCount] = useState(0);
   const [copied, setCopied] = useState(null);
-  const [expandedMsg, setExpandedMsg] = useState(null);
   const [apiError, setApiError] = useState(null);
   const maxFree = 10;
   const topRef = useRef(null);
@@ -151,18 +130,41 @@ function App() {
     );
   };
 
+  const DEMO_PROFILE = {
+    firstName: "Thomas",
+    lastName: "Martin",
+    fullName: "Thomas Martin",
+    profilePhotoUrl: "",
+    headline: "Co-Founder chez JOGL Network",
+    jobTitle: "Co-Founder",
+    company: "JOGL Network",
+    location: "Paris, France",
+    about: "Thomas pilote une structure orientée développement commercial et partenariat. Ses prises de parole tournent autour de la croissance, de l'acquisition et de l'exécution.",
+    recentPosts: [
+      { text: "Quand on gère les projets clients, le business dev passe souvent au second plan.", likes: 42, comments: 9, date: "2026-03-29" }
+    ]
+  };
+
   const DEMO_FALLBACK = (selectedToneDetails, sender) => selectedToneDetails.map(t => ({
     tone_id: t.id,
     tone_name: t.name,
-    internal_message: `Hello Thomas,\n\nDans l'un de tes derniers posts tu parlais de cette tension entre la production client et le développement commercial.\n\nOn a justement créé ${sender.offer || "Lidmeo"} pour que la prospection tourne en fond sans monopoliser l'équipe.\n\nAu vu de ton rôle chez JOGL Network, je me suis dit que ça pouvait faire sens.\n\nÇa te dirait qu'on en parle 10 minutes ?`,
-    relance_linkedin: `Thomas, je reviens vers toi rapidement.\n\nOn aide des structures comme JOGL Network à garder une acquisition active sans y passer leurs journées.\n\nTu aurais 10 min cette semaine ?`,
-    message_mail: `Objet : garder un pipeline actif sans y passer du temps\n\nBonjour Thomas,\n\nDans beaucoup d'agences, l'acquisition passe après les projets en cours. C'est logique, mais ça rend le pipe moins prévisible.\n\nOn a créé ${sender.offer || "Lidmeo"} pour répondre à ça : automatiser la prospection LinkedIn et le suivi, sans ajouter une couche d'outils ou de charge mentale.\n\nL'idée est simple : ${sender.valueProposition || "faire tourner l'acquisition en continu sans commercial dédié"}.\n\nAu vu du positionnement de JOGL Network, je me suis dit que le sujet pouvait être pertinent.\n\nEst-ce que c'est un sujet d'actualité chez vous en ce moment ?\n\n${sender.name || "Lilian"}`,
-    resume_profil: `Thomas semble piloter une structure où les sujets de delivery et d'acquisition se croisent fortement. Le bon angle commercial est la continuité du pipe sans alourdir l'opérationnel. La personnalisation peut s'appuyer sur son rôle et sur ses prises de parole autour de la croissance.`,
-    linkedinHeadline: "Co-Founder chez JOGL Network",
-    linkedinJobTitle: "Co-Founder",
-    companyIndustry: "Agence / réseau B2B",
-    linkedinDescription: "Profil orienté développement et structuration de projets.",
-    linkedinSkillsLabel: "acquisition, réseau, développement commercial"
+    messages: [
+      {
+        text: `Hello Thomas,\n\nDans l'un de tes derniers posts tu parlais de cette tension entre les projets en cours et le développement commercial.\n\nOn a justement créé ${sender.offer || "Lidmeo"} pour que la prospection tourne en fond sans monopoliser l'équipe.\n\nÇa te dirait qu'on en parle 10 minutes ?`,
+        hook: "Rebond sur un post récent",
+        signal: "Post sur la tension delivery / acquisition"
+      },
+      {
+        text: `Hello Thomas,\n\nAvec mon associé, on vient de lancer une jeune startup.\n\nOn a développé ${sender.offer || "Lidmeo"}.\n\nAu vu de ton rôle de Co-Founder chez JOGL Network, je me suis dit que ça pouvait clairement faire sens pour ${sender.valueProposition || "structurer l'acquisition sans ajouter de charge"}.\n\nOuvert à en parler 10 minutes ?`,
+        hook: "Adaptation directe du message de base",
+        signal: "Rôle + entreprise"
+      },
+      {
+        text: `Hello Thomas,\n\nOn accompagne des structures comme JOGL Network pour garder une acquisition active même quand toute l'énergie part dans les projets clients.\n\nC'est exactement l'angle auquel ton profil m'a fait penser.\n\nTu serais dispo 10 minutes pour voir si ça colle à votre contexte ?`,
+        hook: "Angle opérationnel",
+        signal: "Contexte fondateur / production"
+      }
+    ]
   }));
 
   const generateMessages = async (demoMode = false) => {
@@ -175,9 +177,11 @@ function App() {
 
     if (demoMode) {
       await new Promise(r => setTimeout(r, 1200));
+      setProspectProfile(DEMO_PROFILE);
       setRecommendation({
         tone_id: selectedToneDetails[0]?.id || "direct",
         tone_name: selectedToneDetails[0]?.name || "Direct",
+        message_index: 0,
         reason: "Ce ton garde la structure de base tout en reliant clairement le signal du prospect à la proposition de valeur."
       });
       setMessages(DEMO_FALLBACK(selectedToneDetails, userInfo));
@@ -200,6 +204,7 @@ function App() {
         throw new Error(errData.error || "Impossible d'analyser ce profil LinkedIn.");
       }
       const profile = await profileRes.json();
+      setProspectProfile(profile);
 
       setLoadingStep("Analyse du profil, des posts et commentaires...");
       await new Promise(r => setTimeout(r, 800));
@@ -234,6 +239,7 @@ function App() {
       setApiError(err.message || "Une erreur inattendue s'est produite.");
       setMessages([]);
       setRecommendation(null);
+      setProspectProfile(null);
     }
 
     setLoading(false);
@@ -429,15 +435,16 @@ function App() {
       background: C.white,
       border: `1px solid ${C.border}`,
       borderRadius: 14,
-      marginBottom: 10,
-      overflow: "hidden"
+      marginBottom: 12,
+      overflow: "hidden",
+      boxShadow: "0 8px 24px rgba(15, 23, 42, 0.04)"
     },
     resultHeader: {
-      padding: "14px 16px",
+      padding: "14px 16px 0",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      cursor: "pointer"
+      gap: 10
     },
     resultHook: { fontSize: 13, fontWeight: 600, color: C.text, flex: 1 },
     resultBadge: {
@@ -451,7 +458,7 @@ function App() {
       flexShrink: 0
     },
     resultBody: {
-      padding: "0 16px 16px",
+      padding: "12px 16px 16px",
       fontSize: 14,
       lineHeight: 1.7,
       color: C.text,
@@ -473,6 +480,24 @@ function App() {
       fontFamily: "inherit",
       marginTop: 12
     }),
+    signalPill: {
+      fontSize: 11,
+      color: C.textMid,
+      background: C.bg,
+      border: `1px solid ${C.border}`,
+      borderRadius: 999,
+      padding: "5px 10px",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6
+    },
+    resultFooter: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      marginTop: 12
+    },
     // Loading
     loadWrap: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 300, gap: 16 },
     spinner: { width: 36, height: 36, border: `3px solid ${C.border}`, borderTop: `3px solid ${C.blue}`, borderRadius: "50%", animation: "lidmeo-spin 0.8s linear infinite" },
@@ -489,11 +514,98 @@ function App() {
     },
     // Profile card in results
     profileCard: {
-      background: C.bluePale,
+      background: "linear-gradient(135deg, #F8FAFF 0%, #EFF6FF 100%)",
       border: `1px solid ${C.blueBorder}`,
+      borderRadius: 20,
+      padding: "20px",
+      marginBottom: 24,
+      boxShadow: "0 16px 40px rgba(37, 99, 235, 0.08)"
+    },
+    profileTop: {
+      display: "flex",
+      alignItems: "center",
+      gap: 16,
+      marginBottom: 16
+    },
+    profileAvatar: {
+      width: 72,
+      height: 72,
+      borderRadius: "50%",
+      overflow: "hidden",
+      flexShrink: 0,
+      border: `3px solid ${C.white}`,
+      boxShadow: "0 10px 24px rgba(37, 99, 235, 0.14)",
+      background: C.bluePale
+    },
+    profileAvatarImg: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      display: "block"
+    },
+    profileAvatarFallback: {
+      width: "100%",
+      height: "100%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)",
+      color: C.white,
+      fontSize: 26,
+      fontWeight: 800
+    },
+    profileName: {
+      fontSize: 22,
+      fontWeight: 800,
+      color: C.text,
+      letterSpacing: "-0.02em",
+      margin: 0
+    },
+    profileRole: {
+      fontSize: 14,
+      color: C.textMid,
+      margin: "4px 0 0",
+      lineHeight: 1.5
+    },
+    profilePills: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 12
+    },
+    profilePill: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.blue,
+      background: C.white,
+      border: `1px solid ${C.blueBorder}`,
+      borderRadius: 999,
+      padding: "6px 10px"
+    },
+    profileInfoGrid: {
+      display: "grid",
+      gridTemplateColumns: "1fr",
+      gap: 12
+    },
+    profileInfoCard: {
+      background: C.white,
+      border: `1px solid ${C.border}`,
       borderRadius: 14,
-      padding: "16px 18px",
-      marginBottom: 20
+      padding: "14px 16px"
+    },
+    profileInfoLabel: {
+      fontSize: 11,
+      fontWeight: 800,
+      color: C.textLight,
+      textTransform: "uppercase",
+      letterSpacing: "0.06em",
+      marginBottom: 6
+    },
+    profileInfoValue: {
+      fontSize: 14,
+      color: C.text,
+      lineHeight: 1.6,
+      whiteSpace: "pre-wrap"
     },
     // Tone section header in results
     toneSection: {
@@ -515,21 +627,6 @@ function App() {
       padding: "3px 8px",
       borderRadius: 999
     },
-    metaWrap: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 8,
-      marginBottom: 14
-    },
-    metaTag: {
-      fontSize: 11,
-      lineHeight: 1.45,
-      color: C.textMid,
-      background: C.bg,
-      border: `1px solid ${C.border}`,
-      borderRadius: 999,
-      padding: "6px 10px"
-    },
     footer: {
       padding: "14px 24px",
       borderTop: `1px solid ${C.border}`,
@@ -544,7 +641,7 @@ function App() {
   const renderStep0 = () => (
     <div>
       <p style={S.sub}>
-        Choisissez 1 à 3 styles. L'IA générera une séquence complète par ton choisi : ouverture LinkedIn, relance, email et résumé commercial.
+        Choisissez 1 à 3 styles. L'IA générera 3 messages LinkedIn personnalisés pour chaque ton choisi.
       </p>
       {TONES.map(tone => {
         const selected = selectedTones.includes(tone.id);
@@ -654,7 +751,7 @@ function App() {
           disabled={!profileUrl.includes("linkedin.com") || usageCount >= maxFree}
           onClick={() => generateMessages(false)}
         >
-          Analyser & générer les séquences
+          Analyser & générer les messages
         </button>
         <button
           style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: C.textLight, marginTop: 12, fontFamily: "inherit", textDecoration: "underline" }}
@@ -681,6 +778,11 @@ function App() {
     const recoTone = recommendation && messages.length > 0
       ? messages.find(t => t.tone_id === recommendation.tone_id) || null
       : null;
+    const recoMsg = recoTone?.messages?.[recommendation?.message_index ?? 0] || null;
+    const totalMessages = messages.reduce((acc, tone) => acc + (tone.messages?.length || 0), 0);
+    const profilePrimaryLine = prospectProfile?.jobTitle
+      ? [prospectProfile.jobTitle, prospectProfile.company].filter(Boolean).join(" chez ")
+      : prospectProfile?.headline || prospectProfile?.company || "";
 
     if (apiError) {
       return (
@@ -713,78 +815,51 @@ function App() {
       <div>
         <p style={S.sub}>
           {messages.length > 0
-            ? `${messages.length} séquence${messages.length > 1 ? "s" : ""} générée${messages.length > 1 ? "s" : ""} dans ${messages.length} style${messages.length > 1 ? "s" : ""}`
+            ? `${totalMessages} messages LinkedIn générés dans ${messages.length} style${messages.length > 1 ? "s" : ""}`
             : "Génération en cours..."}
         </p>
 
-        {messages.map((toneGroup, tIdx) => {
-          const tone = TONES.find(t => t.id === toneGroup.tone_id);
-          const isRecoTone = recommendation && toneGroup.tone_id === recommendation.tone_id;
-          const metaFields = PROFILE_FIELDS.filter(field => toneGroup[field.key]);
-          return (
-            <div key={tIdx}>
-              <div style={S.toneSection}>
-                <span style={{ fontSize: 18 }}>{tone?.emoji}</span>
-                {toneGroup.tone_name}
-                {isRecoTone && <span style={S.toneReco}>RECOMMANDÉ</span>}
+        {prospectProfile && (
+          <div style={S.profileCard}>
+            <div style={S.profileTop}>
+              <div style={S.profileAvatar}>
+                {prospectProfile.profilePhotoUrl ? (
+                  <img
+                    src={prospectProfile.profilePhotoUrl}
+                    alt={prospectProfile.fullName || "Photo du prospect"}
+                    style={S.profileAvatarImg}
+                  />
+                ) : (
+                  <div style={S.profileAvatarFallback}>{getInitials(prospectProfile)}</div>
+                )}
               </div>
-              {metaFields.length > 0 && (
-                <div style={S.metaWrap}>
-                  {metaFields.map(field => (
-                    <div key={field.key} style={S.metaTag}>
-                      <strong>{field.label} :</strong> {toneGroup[field.key]}
-                    </div>
-                  ))}
+              <div style={{ flex: 1 }}>
+                <h2 style={S.profileName}>{prospectProfile.fullName || "Prospect LinkedIn"}</h2>
+                {profilePrimaryLine && <p style={S.profileRole}>{profilePrimaryLine}</p>}
+                <div style={S.profilePills}>
+                  {prospectProfile.location && <span style={S.profilePill}>{prospectProfile.location}</span>}
+                  <span style={S.profilePill}>{(prospectProfile.recentPosts || []).length} post{(prospectProfile.recentPosts || []).length > 1 ? "s" : ""} analysé{(prospectProfile.recentPosts || []).length > 1 ? "s" : ""}</span>
+                </div>
+              </div>
+            </div>
+            <div style={S.profileInfoGrid}>
+              {prospectProfile.headline && (
+                <div style={S.profileInfoCard}>
+                  <div style={S.profileInfoLabel}>Titre LinkedIn</div>
+                  <div style={S.profileInfoValue}>{prospectProfile.headline}</div>
                 </div>
               )}
-              {RESULT_FIELDS.map((field, fIdx) => {
-                const key = `${toneGroup.tone_id}-${field.key}`;
-                const isOpen = expandedMsg === key;
-                const value = toneGroup[field.key] || "";
-                const isRecoCard = isRecoTone && field.key === "internal_message";
-                return (
-                  <div key={field.key} style={{
-                    ...S.resultCard,
-                    ...(isRecoCard ? { borderColor: C.blue, background: C.bluePale } : {})
-                  }}>
-                    <div style={S.resultHeader} onClick={() => setExpandedMsg(isOpen ? null : key)}>
-                      {isRecoCard ? (
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, color: C.white, background: C.blue,
-                          padding: "3px 8px", borderRadius: 6, marginRight: 10, flexShrink: 0
-                        }}>⭐ RECO</span>
-                      ) : (
-                        <span style={S.resultBadge}>#{fIdx + 1}</span>
-                      )}
-                      <span style={S.resultHook}>{field.label}</span>
-                      <div style={{
-                        width: 22, height: 22, borderRadius: 11,
-                        background: isOpen ? C.bluePale : C.bg,
-                        color: isOpen ? C.blue : C.textLight,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 13, fontWeight: 700, flexShrink: 0
-                      }}>{isOpen ? "−" : "+"}</div>
-                    </div>
-                    {isOpen && (
-                      <div style={S.resultBody}>
-                        {value ? value : <span style={S.resultEmpty}>Aucun contenu généré pour ce champ.</span>}
-                        {value && (
-                          <div>
-                            <button style={S.copyBtn(copied === key)}
-                              onClick={e => { e.stopPropagation(); copyMessage(value, key); }}
-                            >{copied === key ? "✓ Copié" : field.copyLabel}</button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {prospectProfile.about && (
+                <div style={S.profileInfoCard}>
+                  <div style={S.profileInfoLabel}>À propos</div>
+                  <div style={S.profileInfoValue}>{prospectProfile.about}</div>
+                </div>
+              )}
             </div>
-          );
-        })}
+          </div>
+        )}
 
-        {recoTone && messages.length > 0 && (
+        {recoMsg && messages.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 28, marginBottom: 20 }}>
             <div style={{ flex: 1, height: 1, background: C.border }} />
             <span style={{ fontSize: 12, fontWeight: 600, color: C.textLight, whiteSpace: "nowrap" }}>Notre recommandation</span>
@@ -792,7 +867,7 @@ function App() {
           </div>
         )}
 
-        {recoTone && (
+        {recoMsg && (
           <div style={{
             background: `linear-gradient(135deg, ${C.bluePale} 0%, #DBEAFE 100%)`,
             border: `2px solid ${C.blue}`,
@@ -810,7 +885,7 @@ function App() {
               <span style={{ fontSize: 18 }}>⭐</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 800, color: C.white }}>Recommandation Lidmeo</div>
-                <div style={{ fontSize: 11, color: "#BFDBFE", marginTop: 1 }}>Le ton avec le meilleur potentiel de réponse sur l'ouverture LinkedIn</div>
+                <div style={{ fontSize: 11, color: "#BFDBFE", marginTop: 1 }}>Le message avec le meilleur potentiel de réponse pour ce prospect</div>
               </div>
               <div style={{
                 background: "#FFFFFF20",
@@ -822,13 +897,19 @@ function App() {
               }}>{recoTone.tone_name}</div>
             </div>
             <div style={{ padding: "18px 20px", fontSize: 14, lineHeight: 1.75, color: C.text, whiteSpace: "pre-wrap" }}>
-              {recoTone.internal_message}
+              {recoMsg.text}
             </div>
             <div style={{ padding: "0 20px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ background: C.white, borderRadius: 10, padding: "10px 14px", display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: C.blue, background: C.bluePale, padding: "2px 8px", borderRadius: 4, flexShrink: 0, marginTop: 1 }}>POURQUOI</span>
                 <span style={{ fontSize: 12, color: C.textMid, lineHeight: 1.5 }}>{recommendation.reason}</span>
               </div>
+              {recoMsg.signal && (
+                <div style={S.signalPill}>
+                  <span style={{ color: C.blue }}>●</span>
+                  Signal utilisé : {recoMsg.signal}
+                </div>
+              )}
               <button
                 style={{
                   padding: "12px 20px", borderRadius: 10,
@@ -838,14 +919,74 @@ function App() {
                   fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
                   transition: "all 0.2s", width: "100%"
                 }}
-                onClick={() => copyMessage(recoTone.internal_message, "reco")}
+                onClick={() => copyMessage(recoMsg.text, "reco")}
               >{copied === "reco" ? "✓ Message copié" : "Copier ce message"}</button>
             </div>
           </div>
         )}
 
+        {messages.map((toneGroup, tIdx) => {
+          const tone = TONES.find(t => t.id === toneGroup.tone_id);
+          const isRecoTone = recommendation && toneGroup.tone_id === recommendation.tone_id;
+          return (
+            <div key={tIdx}>
+              <div style={S.toneSection}>
+                <span style={{ fontSize: 18 }}>{tone?.emoji}</span>
+                {toneGroup.tone_name}
+                {isRecoTone && <span style={S.toneReco}>RECOMMANDÉ</span>}
+              </div>
+              {(toneGroup.messages || []).map((msg, mIdx) => {
+                const key = `${toneGroup.tone_id}-${mIdx}`;
+                const isRecoCard = isRecoTone && mIdx === recommendation?.message_index;
+                return (
+                  <div
+                    key={key}
+                    style={{
+                      ...S.resultCard,
+                      ...(isRecoCard ? { borderColor: C.blue, background: C.bluePale } : {})
+                    }}
+                  >
+                    <div style={S.resultHeader}>
+                      {isRecoCard ? (
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, color: C.white, background: C.blue,
+                          padding: "3px 8px", borderRadius: 6, marginRight: 10, flexShrink: 0
+                        }}>⭐ RECO</span>
+                      ) : (
+                        <span style={S.resultBadge}>#{mIdx + 1}</span>
+                      )}
+                      <span style={S.resultHook}>{msg.hook || `Message ${mIdx + 1}`}</span>
+                    </div>
+                    <div style={S.resultBody}>
+                      {msg.text ? msg.text : <span style={S.resultEmpty}>Aucun message généré.</span>}
+                      {msg.text && (
+                        <div style={S.resultFooter}>
+                          {msg.signal ? (
+                            <span style={S.signalPill}>
+                              <span style={{ color: C.blue }}>●</span>
+                              {msg.signal}
+                            </span>
+                          ) : (
+                            <span />
+                          )}
+                          <button
+                            style={S.copyBtn(copied === key)}
+                            onClick={() => copyMessage(msg.text, key)}
+                          >
+                            {copied === key ? "✓ Copié" : "Copier le message"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+
         <div style={{ ...S.btnRow, marginTop: 20 }}>
-          <button style={S.btnSecondary} onClick={() => { setMessages([]); setRecommendation(null); setProfileUrl(""); setExpandedMsg(null); setStep(2); }}>
+          <button style={S.btnSecondary} onClick={() => { setMessages([]); setRecommendation(null); setProspectProfile(null); setProfileUrl(""); setStep(2); }}>
             ← Nouveau profil
           </button>
           {usageCount >= maxFree && (
@@ -873,7 +1014,7 @@ function App() {
     "Choisissez vos styles de messages",
     "Parlez-nous de votre offre",
     "Analysez un profil LinkedIn",
-    "Vos séquences personnalisées"
+    "Vos messages personnalisés"
   ];
 
   return (

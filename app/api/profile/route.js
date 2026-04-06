@@ -12,6 +12,67 @@ function extractUsername(url) {
   return match ? match[1] : null;
 }
 
+function getNestedValue(source, path) {
+  return path.split(".").reduce((value, segment) => {
+    if (value == null) return undefined;
+    if (Array.isArray(value) && /^\d+$/.test(segment)) return value[Number(segment)];
+    return value[segment];
+  }, source);
+}
+
+function getFirstString(source, paths) {
+  for (const path of paths) {
+    const value = getNestedValue(source, path);
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function findProfilePhotoUrl(source) {
+  const directPaths = [
+    "profile_picture_url",
+    "profile_picture",
+    "profile_picture_url_large",
+    "profile_picture_url_small",
+    "picture_url",
+    "picture",
+    "photo_url",
+    "photo",
+    "avatar_url",
+    "avatar",
+    "profile_image_url",
+    "image_url",
+    "images.0.url",
+    "pictures.0.url",
+  ];
+
+  const directMatch = getFirstString(source, directPaths);
+  if (directMatch) return directMatch;
+
+  const visited = new Set();
+  const stack = [source];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current || typeof current !== "object" || visited.has(current)) continue;
+    visited.add(current);
+
+    for (const [key, value] of Object.entries(current)) {
+      if (typeof value === "string") {
+        const normalizedKey = key.toLowerCase();
+        const looksLikePhotoField = /(avatar|photo|picture|profile.*image|profile.*picture)/.test(normalizedKey);
+        const excludedField = /(logo|banner|background|cover|company)/.test(normalizedKey);
+        const looksLikeUrl = /^https?:\/\//.test(value);
+        if (looksLikePhotoField && !excludedField && looksLikeUrl) return value;
+      } else if (value && typeof value === "object") {
+        stack.push(value);
+      }
+    }
+  }
+
+  return "";
+}
+
 export async function POST(req) {
   try {
     const { profileUrl } = await req.json();
@@ -82,10 +143,22 @@ export async function POST(req) {
 
     // 3. Build clean profile object
     // Note: Unipile confirmed fields — no "company" at root, use work_experience[0]
+    const firstName = profile.first_name || "";
+    const lastName = profile.last_name || "";
+    const jobTitle =
+      profile.work_experience?.[0]?.position ||
+      profile.work_experience?.[0]?.title ||
+      profile.job_title ||
+      profile.occupation ||
+      "";
+
     const cleanProfile = {
-      firstName: profile.first_name || "",
-      lastName: profile.last_name || "",
+      firstName,
+      lastName,
+      fullName: `${firstName} ${lastName}`.trim(),
+      profilePhotoUrl: findProfilePhotoUrl(profile),
       headline: profile.headline || "",
+      jobTitle,
       company: profile.work_experience?.[0]?.company || "",
       location: profile.location || "",
       about: profile.summary || "",

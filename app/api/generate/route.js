@@ -13,12 +13,7 @@ const TONE_STYLE_GUIDE = {
 };
 
 const SYSTEM_PROMPT = `Tu es un expert en prospection B2B et en personnalisation de messages LinkedIn.
-Ta mission : générer, pour chaque ton demandé, un pack complet de prospection composé de :
-- 1 message LinkedIn d'ouverture
-- 1 relance LinkedIn
-- 1 email
-- 1 résumé commercial du prospect
-- 5 champs de contexte profil
+Ta mission : générer exactement 3 messages LinkedIn d'ouverture personnalisés pour chaque ton demandé.
 
 IMPORTANT :
 - Le prompt de base doit rester très proche des messages fournis par l'utilisateur
@@ -28,8 +23,7 @@ IMPORTANT :
 
 RÈGLES ABSOLUES :
 - Ne jamais inventer une information absente
-- Si une information structurée manque pour un champ dédié, retourne ""
-- Toutes les valeurs JSON doivent être des chaînes de caractères
+- Si une information manque, tu reformules sans l'inventer
 - Retourner UNIQUEMENT un JSON strict et valide, rien d'autre
 - Aucun markdown, aucune balise, aucun commentaire
 
@@ -79,14 +73,15 @@ STYLE :
 - Texte brut avec \\n uniquement
 - Pas de tirets dans les messages, pas de formatage, pas d'emoji
 
-CONTRAINTES PAR CHAMP :
-- internal_message : max 350 caractères
-- relance_linkedin : max 200 caractères
-- message_mail : entre 500 et 1200 caractères, sujet inclus dans la chaîne si pertinent
-- resume_profil : résumé stratégique commercial en 2 à 4 phrases
+CONTRAINTES :
+- Chaque message doit faire maximum 350 caractères
+- Pour chaque ton, génère exactement 3 messages différents
+- Les 3 messages doivent rester proches du message de base avec des variations utiles d'angle ou de signal
+- Si un post est exploitable, au moins 1 des 3 messages doit commencer par une référence claire à ce post
+- Évite de répéter exactement la même accroche sur les 3 messages
 
 RECOMMANDATION :
-Parmi les tons générés, choisis celui dont l'internal_message a le plus de chances d'obtenir une réponse.
+Parmi tous les messages générés, choisis le meilleur.
 Critères :
 1. Personnalisation précise
 2. Lien naturel entre le signal et l'offre
@@ -98,21 +93,30 @@ FORMAT DE SORTIE :
   "recommended": {
     "tone_id": "",
     "tone_name": "",
+    "message_index": "0",
     "reason": ""
   },
   "tones": [
     {
       "tone_id": "",
       "tone_name": "",
-      "internal_message": "",
-      "relance_linkedin": "",
-      "message_mail": "",
-      "resume_profil": "",
-      "linkedinHeadline": "",
-      "linkedinJobTitle": "",
-      "companyIndustry": "",
-      "linkedinDescription": "",
-      "linkedinSkillsLabel": ""
+      "messages": [
+        {
+          "text": "",
+          "hook": "",
+          "signal": ""
+        },
+        {
+          "text": "",
+          "hook": "",
+          "signal": ""
+        },
+        {
+          "text": "",
+          "hook": "",
+          "signal": ""
+        }
+      ]
     }
   ]
 }`;
@@ -121,19 +125,26 @@ function asString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function parseIndex(value) {
+  const parsed = Number.parseInt(asString(value), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function normalizeMessage(rawMessage = {}) {
+  return {
+    text: asString(rawMessage.text),
+    hook: asString(rawMessage.hook),
+    signal: asString(rawMessage.signal),
+  };
+}
+
 function normalizeToneBundle(tone, rawTone = {}) {
+  const rawMessages = Array.isArray(rawTone.messages) ? rawTone.messages : [];
+
   return {
     tone_id: asString(rawTone.tone_id) || tone.id,
     tone_name: asString(rawTone.tone_name) || tone.name,
-    internal_message: asString(rawTone.internal_message),
-    relance_linkedin: asString(rawTone.relance_linkedin),
-    message_mail: asString(rawTone.message_mail),
-    resume_profil: asString(rawTone.resume_profil),
-    linkedinHeadline: asString(rawTone.linkedinHeadline),
-    linkedinJobTitle: asString(rawTone.linkedinJobTitle),
-    companyIndustry: asString(rawTone.companyIndustry),
-    linkedinDescription: asString(rawTone.linkedinDescription),
-    linkedinSkillsLabel: asString(rawTone.linkedinSkillsLabel),
+    messages: Array.from({ length: 3 }, (_, index) => normalizeMessage(rawMessages[index] || {})),
   };
 }
 
@@ -158,6 +169,7 @@ function normalizeResponse(parsed, tones) {
     recommended: {
       tone_id: recommendedTone.tone_id || "",
       tone_name: recommendedTone.tone_name || "",
+      message_index: parseIndex(parsed?.recommended?.message_index),
       reason: asString(parsed?.recommended?.reason) || "Ce ton garde le meilleur équilibre entre personnalisation, clarté et fidélité au message de base.",
     },
     tones: normalizedTones,
@@ -188,7 +200,7 @@ export async function POST(req) {
     const target = asString(userInfo.target);
     const valueProposition = asString(userInfo.valueProposition);
     const offer = asString(userInfo.offer);
-    const structureContext = company ? `une structure comme ${company}` : "une structure de services B2B";
+    const greetingLine = firstName ? `Hello ${firstName},` : "Hello,";
     const roleCompanyLine = role && company
       ? `Au vu de ton rôle de ${role} chez ${company}, je me suis dit que ça pouvait clairement faire sens pour ${valueProposition}.`
       : role
@@ -196,11 +208,8 @@ export async function POST(req) {
         : company
           ? `Au vu de ce que vous développez chez ${company}, je me suis dit que ça pouvait clairement faire sens pour ${valueProposition}.`
           : `En regardant votre positionnement, je me suis dit que ça pouvait clairement faire sens pour ${valueProposition}.`;
-    const emailCompanyLine = company
-      ? `Est-ce que c'est un sujet qui te parle en ce moment chez ${company} ?`
-      : "Est-ce que c'est un sujet qui te parle en ce moment ?";
 
-    const linkedinBaseMessage = `Hello ${firstName},
+    const linkedinBaseMessage = `${greetingLine}
 
 Avec mon associé, on vient de lancer une jeune startup.
 
@@ -211,25 +220,6 @@ On l'a déjà implanté dans plusieurs structures et ça change vraiment le quot
 ${roleCompanyLine}
 
 Ça te dirait qu'on prenne 10 minutes pour en discuter ?`;
-
-    const followupBaseMessage = `${firstName}, je reviens vers toi rapidement.
-Quand on gère ${structureContext}, la prospection c'est souvent le truc qu'on repousse parce qu'on est la tête dans les projets.
-C'est exactement pour ça qu'on a créé cette offre, pour que ça tourne en fond sans que tu aies à t'en occuper.
-Est-ce que tu aurais 10 min cette semaine pour que je te montre comment ça marche concrètement ?`;
-
-    const emailBaseMessage = `Objet : ${valueProposition}
-
-Bonjour ${firstName},
-
-La plupart des ${target || "dirigeants de structures B2B"} que je croise s'appuient beaucoup sur leur réseau ou le bouche-à-oreille. Ça fonctionne, jusqu'au moment où il faut relancer l'acquisition sans y passer ses journées.
-
-On a développé ${offer}.
-
-L'idée est simple : ${valueProposition}.
-
-${emailCompanyLine}
-
-${contactName}`;
 
     const userPrompt = `Adapte les messages de base ci-dessous au prospect et aux tons demandés.
 
@@ -249,27 +239,17 @@ CONTEXTE EXPÉDITEUR :
 - target : ${target}
 - valueProposition : ${valueProposition}
 
-OFFRE :
-${offer}
-
 MESSAGE DE BASE LINKEDIN (à adapter à chaque prospect) :
 ${linkedinBaseMessage}
-
-RELANCE DE BASE LINKEDIN (à adapter) :
-${followupBaseMessage}
-
-EMAIL DE BASE (à adapter) :
-${emailBaseMessage}
 
 TONS À PRODUIRE :
 ${tones.map((tone) => `- ${tone.id} (${tone.name}) : ${tone.tagline} | Consigne de style : ${TONE_STYLE_GUIDE[tone.id] || "Garde le style de base tout en respectant le ton demandé."}`).join("\n")}
 
 Consigne finale :
-- Produis exactement un objet complet par ton demandé
+- Produis exactement 3 messages d'ouverture LinkedIn par ton demandé
 - Chaque ton doit garder la même ossature commerciale de base, avec une expression adaptée au style
 - Si un post n'est pas exploitable, ignore-le complètement
-- Les champs structurés linkedinHeadline, linkedinJobTitle, companyIndustry, linkedinDescription et linkedinSkillsLabel doivent refléter uniquement des infos présentes ou déductibles avec forte confiance du profil
-- Si une donnée structurée n'est pas disponible avec forte confiance, retourne ""
+- Les champs hook et signal doivent être courts, lisibles et utiles pour l'interface
 - recommended.reason doit être court et concret`;
 
     const completion = await openai.chat.completions.create({
