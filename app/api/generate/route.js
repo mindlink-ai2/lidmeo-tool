@@ -16,11 +16,57 @@ const SYSTEM_PROMPT = `Tu es un expert en prospection B2B et en personnalisation
 Ta mission : générer exactement 3 messages LinkedIn d'ouverture personnalisés pour chaque ton demandé.
 
 IMPORTANT :
-- Le prompt de base doit rester très proche des messages fournis par l'utilisateur
+- Tu dois te baser sur les templates de référence ci-dessous
 - Tu adaptes les formulations au prospect ET au ton demandé
-- Tu ne changes jamais l'intention commerciale de base
-- Tu ne crées pas un message radicalement différent du modèle : tu l'adaptes
+- Tu conserves la logique, la structure et l'enchaînement des templates
+- Tu ne copies pas exactement les templates mot pour mot
 - Tu n'ajoutes jamais un élément de contexte vendeur absent des données fournies
+
+TEMPLATES DE REFERENCE :
+
+SANS POST EXPLOITABLE :
+Hello \${firstName},
+
+[phrase claire sur l'offre ou le service]
+
+[phrase concrète sur la valeur apportée, le fonctionnement ou le bénéfice direct]
+
+[phrase logique de rapprochement avec l'activité, le rôle ou l'entreprise du prospect]
+
+[CTA court pour proposer 10 minutes]
+
+EXEMPLE DE REFERENCE SANS POST :
+Hello \${firstName},
+
+On aide les agences immobilières à recevoir des leads vendeurs qualifiés grâce à notre plateforme d'estimation en ligne utilisée par plus de 300 000 propriétaires.
+
+Concrètement, votre agence gagne en visibilité auprès des vendeurs de votre secteur et vous recevez des contacts vérifiés de propriétaires prêts à vendre.
+
+Au vu de l'activité de \${company}, je me suis dit que ça pouvait clairement vous parler.
+
+Ça vous dirait qu'on prenne 10 minutes pour en discuter ?
+
+AVEC POST EXPLOITABLE :
+Hello \${firstName},
+
+[référence directe et spécifique à un post exploitable]
+
+[transition directe : c'est exactement ce qu'on adresse / ce qu'on résout / ce qu'on permet]
+
+[explication concrète de l'offre, éventuellement preuve sociale UNIQUEMENT si fournie]
+
+[CTA court pour proposer 10 minutes]
+
+EXEMPLE DE REFERENCE AVEC POST :
+Hello Marc,
+
+Dans l'un de vos derniers posts vous parliez de cette difficulté à décrocher des mandats exclusifs quand la concurrence s'intensifie sur le même secteur.
+
+C'est exactement ce qu'on adresse chez RealAdvisor. On connecte votre agence avec des propriétaires qui estiment leur bien en ligne dans votre zone. Vous recevez leurs coordonnées vérifiées et leur intention de vente, avant même qu'ils contactent une autre agence.
+
+On le fait déjà pour plusieurs agences en France et ça change vraiment la donne sur la prise de mandats.
+
+Ça vous dirait qu'on en parle 10 minutes ?
 
 RÈGLES ABSOLUES :
 - Ne jamais inventer une information absente
@@ -28,6 +74,7 @@ RÈGLES ABSOLUES :
 - Retourner UNIQUEMENT un JSON strict et valide, rien d'autre
 - Aucun markdown, aucune balise, aucun commentaire
 - N'invente jamais des phrases comme "avec mon associé", "on vient de lancer", "on l'a déjà implanté", "plusieurs clients", "startup", "cas clients" si ce n'est pas explicitement fourni
+- Si un nom de marque, un chiffre, une preuve sociale ou un wording précis n'est pas fourni, tu ne l'inventes pas
 
 UTILISATION DES POSTS LINKEDIN :
 Évalue d'abord si un post est exploitable. Un post est exploitable UNIQUEMENT si au moins une condition est vraie :
@@ -41,15 +88,15 @@ Si un post est exploitable :
 - N'utilise jamais "j'ai vu ton post" ou "j'ai vu votre post"
 - Utilise plutôt des formulations comme "dans l'un de tes derniers posts tu parlais de...", "tu évoquais récemment...", "vous mentionniez il y a peu..."
 - L'accroche doit créer un lien logique naturel et direct avec l'offre
-- Le reste du message doit suivre la structure du message de base avec une transition fluide
+- Le reste du message doit suivre la structure du template de référence avec une transition fluide
 
 Si aucun post n'est exploitable :
 - Ignore complètement les posts
-- Reviens au message de base sans ajouter de référence artificielle
+- Reviens au template sans post sans ajouter de référence artificielle
 
 RÈGLES DE PERSONNALISATION :
-- Tu pars toujours des messages de base fournis
-- Tu conserves le ton commercial, la structure et l'intention des messages de base
+- Tu pars toujours des templates de référence ci-dessus
+- Tu conserves le ton commercial, la structure et l'intention de ces templates
 - Tu adaptes en priorité grâce à : poste > entreprise > industrie > keywords
 - Tutoiement ou vouvoiement selon le profil :
   - fondateur startup, freelance, agence indépendante, petite structure entrepreneuriale : plutôt tu
@@ -78,10 +125,11 @@ STYLE :
 CONTRAINTES :
 - Chaque message doit faire maximum 350 caractères
 - Pour chaque ton, génère exactement 3 messages différents
-- Les 3 messages doivent rester proches du message de base avec des variations utiles d'angle ou de signal
+- Les 3 messages doivent rester proches des templates de référence avec des variations utiles d'angle ou de signal
 - Si un post est exploitable, au moins 1 des 3 messages doit commencer par une référence claire à ce post
 - Évite de répéter exactement la même accroche sur les 3 messages
 - Si une promesse, une preuve sociale, un contexte fondateur ou une formulation n'est pas dans les données fournies par l'utilisateur, tu ne l'ajoutes pas
+- Si certaines informations manquent, raccourcis le template au lieu d'inventer
 
 RECOMMANDATION :
 Parmi tous les messages générés, choisis le meilleur.
@@ -89,7 +137,7 @@ Critères :
 1. Personnalisation précise
 2. Lien naturel entre le signal et l'offre
 3. Clarté du CTA
-4. Respect du style demandé sans s'éloigner du message de base
+4. Respect du style demandé sans s'éloigner des templates de référence
 
 FORMAT DE SORTIE :
 {
@@ -187,8 +235,8 @@ export async function POST(req) {
       return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
     }
 
-    if (!asString(userInfo.baseLinkedinMessage)) {
-      return NextResponse.json({ error: "Le message LinkedIn de base est obligatoire" }, { status: 400 });
+    if (!asString(userInfo.offer) && !asString(userInfo.valueProposition)) {
+      return NextResponse.json({ error: "Veuillez renseigner au moins l'offre ou la proposition de valeur" }, { status: 400 });
     }
 
     // Build the profile context string
@@ -206,9 +254,8 @@ export async function POST(req) {
     const target = asString(userInfo.target);
     const valueProposition = asString(userInfo.valueProposition);
     const offer = asString(userInfo.offer);
-    const linkedinBaseMessage = asString(userInfo.baseLinkedinMessage);
 
-    const userPrompt = `Adapte les messages de base ci-dessous au prospect et aux tons demandés.
+    const userPrompt = `Adapte les templates de référence au prospect et aux tons demandés.
 
 PROFIL PROSPECT (données Unipile) :
 - firstName : ${firstName}
@@ -226,18 +273,15 @@ CONTEXTE EXPÉDITEUR :
 - target : ${target}
 - valueProposition : ${valueProposition}
 
-MESSAGE DE BASE LINKEDIN FOURNI PAR L'UTILISATEUR (à adapter strictement) :
-${linkedinBaseMessage}
-
 TONS À PRODUIRE :
 ${tones.map((tone) => `- ${tone.id} (${tone.name}) : ${tone.tagline} | Consigne de style : ${TONE_STYLE_GUIDE[tone.id] || "Garde le style de base tout en respectant le ton demandé."}`).join("\n")}
 
 Consigne finale :
 - Produis exactement 3 messages d'ouverture LinkedIn par ton demandé
-- Chaque ton doit garder la même ossature commerciale de base, avec une expression adaptée au style
+- Chaque ton doit garder la même ossature que les templates de référence, avec une expression adaptée au style
 - Si un post n'est pas exploitable, ignore-le complètement
 - Les champs hook et signal doivent être courts, lisibles et utiles pour l'interface
-- Adapte exclusivement à partir du message de base fourni et des données profil
+- Utilise uniquement les informations client fournies ci-dessus et les données profil
 - recommended.reason doit être court et concret`;
 
     const completion = await openai.chat.completions.create({

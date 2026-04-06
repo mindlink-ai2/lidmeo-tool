@@ -107,7 +107,7 @@ function App() {
   const [step, setStep] = useState(0);
   const [selectedTones, setSelectedTones] = useState([]);
   const [previewTone, setPreviewTone] = useState(null);
-  const [userInfo, setUserInfo] = useState({ name: "", offer: "", target: "", valueProposition: "", baseLinkedinMessage: "" });
+  const [userInfo, setUserInfo] = useState({ name: "", offer: "", target: "", valueProposition: "" });
   const [profileUrl, setProfileUrl] = useState("");
   const [prospectProfile, setProspectProfile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -155,14 +155,14 @@ function App() {
         signal: "Post sur la tension delivery / acquisition"
       },
       {
-        text: `Hello Thomas,\n\n${sender.baseLinkedinMessage || "On aide des structures B2B à structurer leur acquisition LinkedIn sans complexifier leur quotidien."}\n\nAu vu de ton rôle de Co-Founder chez JOGL Network, je me suis dit que ça pouvait clairement faire sens.\n\nOuvert à en parler 10 minutes ?`,
-        hook: "Adaptation directe du message de base",
-        signal: "Rôle + entreprise"
+        text: `Hello Thomas,\n\n${sender.offer || "On aide des structures B2B à développer leur acquisition LinkedIn."}\n\n${sender.valueProposition || "Concrètement, l'objectif est de rendre la prospection plus régulière sans alourdir l'opérationnel."}\n\nAu vu de l'activité de JOGL Network, je me suis dit que ça pouvait clairement te parler.\n\nOuvert à en parler 10 minutes ?`,
+        hook: "Template sans post",
+        signal: "Activité + entreprise"
       },
       {
-        text: `Hello Thomas,\n\nOn accompagne des structures comme JOGL Network pour garder une acquisition active même quand toute l'énergie part dans les projets clients.\n\nC'est exactement l'angle auquel ton profil m'a fait penser.\n\nTu serais dispo 10 minutes pour voir si ça colle à votre contexte ?`,
-        hook: "Angle opérationnel",
-        signal: "Contexte fondateur / production"
+        text: `Hello Thomas,\n\nOn aide des structures comme JOGL Network à garder une acquisition active quand les projets prennent toute la place.\n\nConcrètement, ${sender.valueProposition || "la prospection continue de tourner sans complexifier le quotidien."}\n\nTu serais dispo 10 minutes pour voir si ça colle à votre contexte ?`,
+        hook: "Template sans post orienté bénéfice",
+        signal: "Contexte opérationnel"
       }
     ]
   }));
@@ -670,18 +670,13 @@ function App() {
 
   // ─── STEP 1: User Info ───
   const renderStep1 = () => {
-    const ok = userInfo.baseLinkedinMessage.trim();
+    const ok = userInfo.offer.trim() || userInfo.valueProposition.trim();
     return (
       <div>
-        <p style={S.sub}>L'IA part uniquement de ce que vous écrivez ici. Rien ne sera ajouté si vous ne l'avez pas fourni.</p>
+        <p style={S.sub}>L'IA se base sur vos templates de référence et adapte le message avec les infos ci-dessous. Elle n'invente ni promesse, ni preuve sociale, ni contexte absent.</p>
         <label style={S.label}>Votre prénom</label>
         <input style={S.input} placeholder="Ex : Lilian" value={userInfo.name}
           onChange={e => setUserInfo(p => ({ ...p, name: e.target.value }))}
-          onFocus={e => e.target.style.borderColor = C.blue} onBlur={e => e.target.style.borderColor = C.border} />
-
-        <label style={S.label}>Votre message LinkedIn de base</label>
-        <textarea style={{ ...S.textarea, minHeight: 160 }} placeholder={"Ex : Hello {prenom},\n\nOn aide les agences à structurer leur prospection LinkedIn sans multiplier les outils.\n\nAu vu de ton rôle chez {entreprise}, je me suis dit que ça pouvait faire sens.\n\nÇa te dirait qu'on en parle 10 minutes ?"} value={userInfo.baseLinkedinMessage}
-          onChange={e => setUserInfo(p => ({ ...p, baseLinkedinMessage: e.target.value }))}
           onFocus={e => e.target.style.borderColor = C.blue} onBlur={e => e.target.style.borderColor = C.border} />
 
         <label style={S.label}>Que vendez-vous ?</label>
