@@ -107,7 +107,7 @@ function App() {
   const [step, setStep] = useState(0);
   const [selectedTones, setSelectedTones] = useState([]);
   const [previewTone, setPreviewTone] = useState(null);
-  const [userInfo, setUserInfo] = useState({ name: "", offer: "", target: "", valueProposition: "" });
+  const [userInfo, setUserInfo] = useState({ name: "", offer: "", target: "", valueProposition: "", baseLinkedinMessage: "" });
   const [profileUrl, setProfileUrl] = useState("");
   const [prospectProfile, setProspectProfile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -150,12 +150,12 @@ function App() {
     tone_name: t.name,
     messages: [
       {
-        text: `Hello Thomas,\n\nDans l'un de tes derniers posts tu parlais de cette tension entre les projets en cours et le développement commercial.\n\nOn a justement créé ${sender.offer || "Lidmeo"} pour que la prospection tourne en fond sans monopoliser l'équipe.\n\nÇa te dirait qu'on en parle 10 minutes ?`,
+        text: `Hello Thomas,\n\nDans l'un de tes derniers posts tu parlais de cette tension entre les projets en cours et le développement commercial.\n\n${sender.offer || "On a créé un système pour faire tourner la prospection LinkedIn en fond sans alourdir l'opérationnel."}\n\nÇa te dirait qu'on en parle 10 minutes ?`,
         hook: "Rebond sur un post récent",
         signal: "Post sur la tension delivery / acquisition"
       },
       {
-        text: `Hello Thomas,\n\nAvec mon associé, on vient de lancer une jeune startup.\n\nOn a développé ${sender.offer || "Lidmeo"}.\n\nAu vu de ton rôle de Co-Founder chez JOGL Network, je me suis dit que ça pouvait clairement faire sens pour ${sender.valueProposition || "structurer l'acquisition sans ajouter de charge"}.\n\nOuvert à en parler 10 minutes ?`,
+        text: `Hello Thomas,\n\n${sender.baseLinkedinMessage || "On aide des structures B2B à structurer leur acquisition LinkedIn sans complexifier leur quotidien."}\n\nAu vu de ton rôle de Co-Founder chez JOGL Network, je me suis dit que ça pouvait clairement faire sens.\n\nOuvert à en parler 10 minutes ?`,
         hook: "Adaptation directe du message de base",
         signal: "Rôle + entreprise"
       },
@@ -561,10 +561,16 @@ function App() {
       letterSpacing: "-0.02em",
       margin: 0
     },
+    profileHeadlineText: {
+      fontSize: 14,
+      color: C.textMid,
+      margin: "6px 0 0",
+      lineHeight: 1.55
+    },
     profileRole: {
       fontSize: 14,
       color: C.textMid,
-      margin: "4px 0 0",
+      margin: "8px 0 0",
       lineHeight: 1.5
     },
     profilePills: {
@@ -581,31 +587,6 @@ function App() {
       border: `1px solid ${C.blueBorder}`,
       borderRadius: 999,
       padding: "6px 10px"
-    },
-    profileInfoGrid: {
-      display: "grid",
-      gridTemplateColumns: "1fr",
-      gap: 12
-    },
-    profileInfoCard: {
-      background: C.white,
-      border: `1px solid ${C.border}`,
-      borderRadius: 14,
-      padding: "14px 16px"
-    },
-    profileInfoLabel: {
-      fontSize: 11,
-      fontWeight: 800,
-      color: C.textLight,
-      textTransform: "uppercase",
-      letterSpacing: "0.06em",
-      marginBottom: 6
-    },
-    profileInfoValue: {
-      fontSize: 14,
-      color: C.text,
-      lineHeight: 1.6,
-      whiteSpace: "pre-wrap"
     },
     // Tone section header in results
     toneSection: {
@@ -689,13 +670,18 @@ function App() {
 
   // ─── STEP 1: User Info ───
   const renderStep1 = () => {
-    const ok = userInfo.offer.trim() && userInfo.target.trim() && userInfo.valueProposition.trim();
+    const ok = userInfo.baseLinkedinMessage.trim();
     return (
       <div>
-        <p style={S.sub}>Ces infos sont saisies une seule fois. Elles servent à personnaliser tous vos messages.</p>
+        <p style={S.sub}>L'IA part uniquement de ce que vous écrivez ici. Rien ne sera ajouté si vous ne l'avez pas fourni.</p>
         <label style={S.label}>Votre prénom</label>
         <input style={S.input} placeholder="Ex : Lilian" value={userInfo.name}
           onChange={e => setUserInfo(p => ({ ...p, name: e.target.value }))}
+          onFocus={e => e.target.style.borderColor = C.blue} onBlur={e => e.target.style.borderColor = C.border} />
+
+        <label style={S.label}>Votre message LinkedIn de base</label>
+        <textarea style={{ ...S.textarea, minHeight: 160 }} placeholder={"Ex : Hello {prenom},\n\nOn aide les agences à structurer leur prospection LinkedIn sans multiplier les outils.\n\nAu vu de ton rôle chez {entreprise}, je me suis dit que ça pouvait faire sens.\n\nÇa te dirait qu'on en parle 10 minutes ?"} value={userInfo.baseLinkedinMessage}
+          onChange={e => setUserInfo(p => ({ ...p, baseLinkedinMessage: e.target.value }))}
           onFocus={e => e.target.style.borderColor = C.blue} onBlur={e => e.target.style.borderColor = C.border} />
 
         <label style={S.label}>Que vendez-vous ?</label>
@@ -780,9 +766,9 @@ function App() {
       : null;
     const recoMsg = recoTone?.messages?.[recommendation?.message_index ?? 0] || null;
     const totalMessages = messages.reduce((acc, tone) => acc + (tone.messages?.length || 0), 0);
-    const profilePrimaryLine = prospectProfile?.jobTitle
+    const profilePrimaryLine = !prospectProfile?.headline && prospectProfile?.jobTitle
       ? [prospectProfile.jobTitle, prospectProfile.company].filter(Boolean).join(" chez ")
-      : prospectProfile?.headline || prospectProfile?.company || "";
+      : (!prospectProfile?.headline ? prospectProfile?.company || "" : "");
 
     if (apiError) {
       return (
@@ -835,26 +821,15 @@ function App() {
               </div>
               <div style={{ flex: 1 }}>
                 <h2 style={S.profileName}>{prospectProfile.fullName || "Prospect LinkedIn"}</h2>
+                {prospectProfile.headline && <p style={S.profileHeadlineText}>{prospectProfile.headline}</p>}
                 {profilePrimaryLine && <p style={S.profileRole}>{profilePrimaryLine}</p>}
                 <div style={S.profilePills}>
+                  {prospectProfile.company && <span style={S.profilePill}>{prospectProfile.company}</span>}
+                  {prospectProfile.jobTitle && <span style={S.profilePill}>{prospectProfile.jobTitle}</span>}
                   {prospectProfile.location && <span style={S.profilePill}>{prospectProfile.location}</span>}
                   <span style={S.profilePill}>{(prospectProfile.recentPosts || []).length} post{(prospectProfile.recentPosts || []).length > 1 ? "s" : ""} analysé{(prospectProfile.recentPosts || []).length > 1 ? "s" : ""}</span>
                 </div>
               </div>
-            </div>
-            <div style={S.profileInfoGrid}>
-              {prospectProfile.headline && (
-                <div style={S.profileInfoCard}>
-                  <div style={S.profileInfoLabel}>Titre LinkedIn</div>
-                  <div style={S.profileInfoValue}>{prospectProfile.headline}</div>
-                </div>
-              )}
-              {prospectProfile.about && (
-                <div style={S.profileInfoCard}>
-                  <div style={S.profileInfoLabel}>À propos</div>
-                  <div style={S.profileInfoValue}>{prospectProfile.about}</div>
-                </div>
-              )}
             </div>
           </div>
         )}

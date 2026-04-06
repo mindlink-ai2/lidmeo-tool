@@ -20,12 +20,14 @@ IMPORTANT :
 - Tu adaptes les formulations au prospect ET au ton demandé
 - Tu ne changes jamais l'intention commerciale de base
 - Tu ne crées pas un message radicalement différent du modèle : tu l'adaptes
+- Tu n'ajoutes jamais un élément de contexte vendeur absent des données fournies
 
 RÈGLES ABSOLUES :
 - Ne jamais inventer une information absente
 - Si une information manque, tu reformules sans l'inventer
 - Retourner UNIQUEMENT un JSON strict et valide, rien d'autre
 - Aucun markdown, aucune balise, aucun commentaire
+- N'invente jamais des phrases comme "avec mon associé", "on vient de lancer", "on l'a déjà implanté", "plusieurs clients", "startup", "cas clients" si ce n'est pas explicitement fourni
 
 UTILISATION DES POSTS LINKEDIN :
 Évalue d'abord si un post est exploitable. Un post est exploitable UNIQUEMENT si au moins une condition est vraie :
@@ -79,6 +81,7 @@ CONTRAINTES :
 - Les 3 messages doivent rester proches du message de base avec des variations utiles d'angle ou de signal
 - Si un post est exploitable, au moins 1 des 3 messages doit commencer par une référence claire à ce post
 - Évite de répéter exactement la même accroche sur les 3 messages
+- Si une promesse, une preuve sociale, un contexte fondateur ou une formulation n'est pas dans les données fournies par l'utilisateur, tu ne l'ajoutes pas
 
 RECOMMANDATION :
 Parmi tous les messages générés, choisis le meilleur.
@@ -184,6 +187,10 @@ export async function POST(req) {
       return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
     }
 
+    if (!asString(userInfo.baseLinkedinMessage)) {
+      return NextResponse.json({ error: "Le message LinkedIn de base est obligatoire" }, { status: 400 });
+    }
+
     // Build the profile context string
     const postsContext = (profile.recentPosts || [])
       .map((p, i) => `- Post ${i + 1} : "${p.text?.slice(0, 500) || ""}" (${p.likes || 0} likes, ${p.comments || 0} commentaires, ${p.date || ""})`)
@@ -193,33 +200,13 @@ export async function POST(req) {
       .map((c, i) => `- Commentaire ${i + 1} : "${c}"`)
       .join("\n");
 
-    const contactName = asString(userInfo.name) || "Lilian";
     const firstName = asString(profile.firstName);
     const role = asString(profile.headline);
     const company = asString(profile.company);
     const target = asString(userInfo.target);
     const valueProposition = asString(userInfo.valueProposition);
     const offer = asString(userInfo.offer);
-    const greetingLine = firstName ? `Hello ${firstName},` : "Hello,";
-    const roleCompanyLine = role && company
-      ? `Au vu de ton rôle de ${role} chez ${company}, je me suis dit que ça pouvait clairement faire sens pour ${valueProposition}.`
-      : role
-        ? `Au vu de ton rôle de ${role}, je me suis dit que ça pouvait clairement faire sens pour ${valueProposition}.`
-        : company
-          ? `Au vu de ce que vous développez chez ${company}, je me suis dit que ça pouvait clairement faire sens pour ${valueProposition}.`
-          : `En regardant votre positionnement, je me suis dit que ça pouvait clairement faire sens pour ${valueProposition}.`;
-
-    const linkedinBaseMessage = `${greetingLine}
-
-Avec mon associé, on vient de lancer une jeune startup.
-
-On a développé ${offer}.
-
-On l'a déjà implanté dans plusieurs structures et ça change vraiment le quotidien.
-
-${roleCompanyLine}
-
-Ça te dirait qu'on prenne 10 minutes pour en discuter ?`;
+    const linkedinBaseMessage = asString(userInfo.baseLinkedinMessage);
 
     const userPrompt = `Adapte les messages de base ci-dessous au prospect et aux tons demandés.
 
@@ -234,12 +221,12 @@ ${postsContext ? `- recentPosts :\n${postsContext}` : "- recentPosts : aucun"}
 ${commentsContext ? `- recentComments :\n${commentsContext}` : "- recentComments : aucun"}
 
 CONTEXTE EXPÉDITEUR :
-- name : ${contactName}
+- name : ${asString(userInfo.name)}
 - offer : ${offer}
 - target : ${target}
 - valueProposition : ${valueProposition}
 
-MESSAGE DE BASE LINKEDIN (à adapter à chaque prospect) :
+MESSAGE DE BASE LINKEDIN FOURNI PAR L'UTILISATEUR (à adapter strictement) :
 ${linkedinBaseMessage}
 
 TONS À PRODUIRE :
@@ -250,6 +237,7 @@ Consigne finale :
 - Chaque ton doit garder la même ossature commerciale de base, avec une expression adaptée au style
 - Si un post n'est pas exploitable, ignore-le complètement
 - Les champs hook et signal doivent être courts, lisibles et utiles pour l'interface
+- Adapte exclusivement à partir du message de base fourni et des données profil
 - recommended.reason doit être court et concret`;
 
     const completion = await openai.chat.completions.create({
