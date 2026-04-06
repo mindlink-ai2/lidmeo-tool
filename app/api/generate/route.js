@@ -98,6 +98,7 @@ RÈGLES DE PERSONNALISATION :
 - Tu pars toujours des templates de référence ci-dessus
 - Tu conserves le ton commercial, la structure et l'intention de ces templates
 - Tu adaptes en priorité grâce à : poste > entreprise > industrie > keywords
+- Si le métier ou l'intitulé du prospect est identifiable via le headline ou le job title, privilégie cette formulation précise plutôt que des expressions vagues comme "votre activité"
 - Tutoiement ou vouvoiement selon le profil :
   - fondateur startup, freelance, agence indépendante, petite structure entrepreneuriale : plutôt tu
   - dirigeant grand compte, direction corporate, doute : vous
@@ -261,6 +262,7 @@ PROFIL PROSPECT (données Unipile) :
 - firstName : ${firstName}
 - lastName : ${asString(profile.lastName)}
 - headline : ${role}
+- jobTitle : ${asString(profile.jobTitle)}
 - company : ${company}
 - location : ${asString(profile.location)}
 - about : ${asString(profile.about).slice(0, 1200)}

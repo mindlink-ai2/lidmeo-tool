@@ -120,6 +120,8 @@ export async function POST(req) {
 
     // 2. Fetch recent posts (non-blocking)
     let recentPosts = [];
+    let postsStatus = "not_requested";
+    let postsError = "";
     try {
       const postsUrl = `${UNIPILE_DSN}/api/v1/users/${username}/posts?account_id=${UNIPILE_ACCOUNT_ID}&limit=3`;
       console.log("[profile] Posts URL:", postsUrl);
@@ -127,6 +129,7 @@ export async function POST(req) {
       if (postsRes.ok) {
         const postsData = await postsRes.json();
         console.log("[profile] Unipile posts response:", JSON.stringify(postsData, null, 2));
+        postsStatus = "ok";
         recentPosts = (postsData.items || postsData || []).slice(0, 3).map((p) => ({
           text: p.text || p.content || "",
           likes: p.reaction_counter ?? p.reactions_count ?? p.likes_count ?? 0,
@@ -136,9 +139,13 @@ export async function POST(req) {
       } else {
         const errText = await postsRes.text();
         console.log("[profile] Posts fetch failed (non-blocking):", postsRes.status, errText);
+        postsStatus = "error";
+        postsError = `Unipile posts ${postsRes.status}`;
       }
     } catch (e) {
       console.log("[profile] Could not fetch posts (non-blocking):", e.message);
+      postsStatus = "error";
+      postsError = e.message || "Posts fetch failed";
     }
 
     // 3. Build clean profile object
@@ -163,6 +170,8 @@ export async function POST(req) {
       location: profile.location || "",
       about: profile.summary || "",
       recentPosts,
+      postsStatus,
+      postsError,
       recentComments: [],
     };
 

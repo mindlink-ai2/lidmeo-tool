@@ -140,6 +140,8 @@ function App() {
     company: "JOGL Network",
     location: "Paris, France",
     about: "Thomas pilote une structure orientée développement commercial et partenariat. Ses prises de parole tournent autour de la croissance, de l'acquisition et de l'exécution.",
+    postsStatus: "ok",
+    postsError: "",
     recentPosts: [
       { text: "Quand on gère les projets clients, le business dev passe souvent au second plan.", likes: 42, comments: 9, date: "2026-03-29" }
     ]
@@ -761,6 +763,9 @@ function App() {
       : null;
     const recoMsg = recoTone?.messages?.[recommendation?.message_index ?? 0] || null;
     const totalMessages = messages.reduce((acc, tone) => acc + (tone.messages?.length || 0), 0);
+    const postsPillLabel = prospectProfile?.postsStatus === "error"
+      ? "Posts LinkedIn non récupérés"
+      : `${(prospectProfile?.recentPosts || []).length} post${(prospectProfile?.recentPosts || []).length > 1 ? "s" : ""} analysé${(prospectProfile?.recentPosts || []).length > 1 ? "s" : ""}`;
     const profilePrimaryLine = !prospectProfile?.headline && prospectProfile?.jobTitle
       ? [prospectProfile.jobTitle, prospectProfile.company].filter(Boolean).join(" chez ")
       : (!prospectProfile?.headline ? prospectProfile?.company || "" : "");
@@ -822,10 +827,15 @@ function App() {
                   {prospectProfile.company && <span style={S.profilePill}>{prospectProfile.company}</span>}
                   {prospectProfile.jobTitle && <span style={S.profilePill}>{prospectProfile.jobTitle}</span>}
                   {prospectProfile.location && <span style={S.profilePill}>{prospectProfile.location}</span>}
-                  <span style={S.profilePill}>{(prospectProfile.recentPosts || []).length} post{(prospectProfile.recentPosts || []).length > 1 ? "s" : ""} analysé{(prospectProfile.recentPosts || []).length > 1 ? "s" : ""}</span>
+                  <span style={S.profilePill}>{postsPillLabel}</span>
                 </div>
               </div>
             </div>
+            {prospectProfile.postsStatus === "error" && (
+              <p style={{ fontSize: 12, color: C.textLight, margin: "2px 0 0" }}>
+                Les posts n'ont pas pu être récupérés depuis Unipile pour ce profil, donc le compteur n'indique pas forcément l'activité réelle.
+              </p>
+            )}
           </div>
         )}
 
